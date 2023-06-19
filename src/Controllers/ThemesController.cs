@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
 using Sfko.Lego.Dto;
+using static Sfko.Lego.DbModel.QueryExtensions;
 
 namespace Sfko.Lego.Controllers;
 
@@ -36,20 +37,7 @@ public class ThemesController : ControllerBase
   public async Task<IEnumerable<Theme>> FullTree()
   {
     _logger.LogDebug($"Fetching entire theme hierarchy");
-    return await FetchThemes($"""
-      WITH RECURSIVE
-        theme_hierarchy(id, name, parent_id) AS (
-          select id, name, parent_id
-          from themes
-          where parent_id is null
-
-          union
-          select themes.id, themes.name, themes.parent_id
-          from themes
-            join theme_hierarchy on themes.parent_id = theme_hierarchy.id
-        )
-      select * from theme_hierarchy
-      """, rootId: null);
+    return await FetchThemes(_context.Themes, rootId: null);
   }
 
   /// <summary>
@@ -69,20 +57,7 @@ public class ThemesController : ControllerBase
     }
 
     _logger.LogDebug($"Fetching subthemes of {rootId}");
-    return await FetchThemes($"""
-      WITH RECURSIVE
-        theme_hierarchy(id, name, parent_id) AS (
-          select id, name, parent_id
-          from themes
-          where parent_id = {rootId}
-
-          union
-          select themes.id, themes.name, themes.parent_id
-          from themes
-            join theme_hierarchy on themes.parent_id = theme_hierarchy.id
-        )
-      select id, name, parent_id from theme_hierarchy
-      """, rootId);
+    return await FetchThemes(_context.Themes.HierarchicalFromRoot(rootId), rootId);
   }
 
   /// <summary>
@@ -92,9 +67,9 @@ public class ThemesController : ControllerBase
   /// <param name="query">A query to fetch a set of themes</param>
   /// <param name="rootId">The parent identifier of the top level of results</param>
   /// <returns>A forest of <see cref="Theme"/> objects</returns>
-  private async Task<IEnumerable<Theme>> FetchThemes( FormattableString query, long? rootId )
+  private async Task<IEnumerable<Theme>> FetchThemes( IQueryable<DbModel.Theme> query, long? rootId )
   {
-    var themes = await _context.Themes.FromSql(query)
+    var themes = await query
       .OrderBy(x => x.ParentThemeId).ThenBy(x => x.Name)
       .ToArrayAsync();
     _logger.LogDebug($"Query for themes found {themes.Length} results");
