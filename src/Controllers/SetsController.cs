@@ -51,7 +51,10 @@ public class SetsController : ControllerBase
       })
       .ToArrayAsync();
     return new SetListResponse {
-      Sets = sets.Take(PAGE_SIZE),
+      Sets = sets.Take(PAGE_SIZE).Select(x => {
+        x.InventoryUrl = Url.Action("Set", "Inventories", new { set_num = x.SetNum });
+        return x;
+      }),
       PrevPageUrl = page > 0 ? Url.Action("List", new { page = page - 1 }) : null,
       NextPageUrl = sets.Count() > PAGE_SIZE ? Url.Action("List", new { page = page + 1 }) : null,
     };

@@ -40,4 +40,9 @@ public class Set
   /// </summary>
   /// <example>342</example>
   public long NumParts { get; set; }
+
+  /// <summary>
+  /// The URL for the inventory of this set, if available.
+  /// </summary>
+  public string? InventoryUrl { get; set; }
 }
