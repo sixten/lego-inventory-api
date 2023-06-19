@@ -46,6 +46,7 @@ public class SetsController : ControllerBase
         Name = x.Name,
         Year = x.Year,
         ThemeId = x.ThemeId,
+        ThemeName = x.Theme.Name,
         NumParts = x.NumParts,
       })
       .ToArrayAsync();

@@ -30,6 +30,12 @@ public class Set
   public long ThemeId { get; set; }
 
   /// <summary>
+  /// The name of the theme to which this set belongs.
+  /// </summary>
+  /// <example>Classic Space</example>
+  public required string ThemeName { get; set; }
+
+  /// <summary>
   /// The number of parts in this set.
   /// </summary>
   /// <example>342</example>
