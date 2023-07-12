@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sfko.Lego.Dto;
@@ -33,10 +34,11 @@ public class SetsController : ControllerBase
   /// <param name="page">A zero-indexed page number within the results</param>
   /// <returns>Information about the matching sets</returns>
   /// <response code="200">Returns information about the matching sets</response>
-  [HttpGet("", Name = "List")]
+  [HttpGet("")]
   [Produces("application/json")]
   public async Task<SetListResponse> List( uint page = 0 )
   {
+    _logger.LogDebug($"Fetching page {page} of sets");
     var sets = await _context.Sets
       .OrderBy(x => x.Name)
       .Skip((int)page * PAGE_SIZE)
@@ -50,6 +52,8 @@ public class SetsController : ControllerBase
         NumParts = x.NumParts,
       })
       .ToArrayAsync();
+
+    _logger.LogDebug($"Returning page {page} with {sets.Length} sets");
     return new SetListResponse {
       Sets = sets.Take(PAGE_SIZE).Select(x => {
         x.InventoryUrl = Url.Action("Set", "Inventories", new { setNum = x.SetNum });
@@ -57,6 +61,64 @@ public class SetsController : ControllerBase
       }),
       PrevPageUrl = page > 0 ? Url.Action("List", new { page = page - 1 }) : null,
       NextPageUrl = sets.Count() > PAGE_SIZE ? Url.Action("List", new { page = page + 1 }) : null,
+    };
+  }
+
+  /// <summary>
+  /// Fetches a paged list of the sets containing the specified part.
+  /// May optionally specify a specific color and minimum quantity for the part.
+  /// </summary>
+  /// <param name="partNum">The identifier of the part</param>
+  /// <param name="colorId">An optional color in which the part must appear</param>
+  /// <param name="minQuantity">An optional minimum quantity for the part</param>
+  /// <param name="page">A zero-indexed page number within the results</param>
+  /// <returns>Information about the matching sets</returns>
+  /// <response code="200">Returns information about the matching sets</response>
+  [HttpGet("containing/{partNum}")]
+  [Produces("application/json")]
+  public async Task<SetListResponse> Containing( string partNum, int? colorId = null, uint? minQuantity = null, uint page = 0 )
+  {
+    _logger.LogDebug($"Checking the existence of part {partNum}");
+    var hasPart = await _context.Parts.AnyAsync(x => x.PartNum == partNum);
+    if( !hasPart ) {
+      _logger.LogDebug($"No part {partNum} found");
+      throw new HttpRequestException("Part not found", null, HttpStatusCode.NotFound);
+    }
+
+    var query = _context.InventoryParts
+      .Where(x => x.PartNum == partNum && !x.IsSpare);
+    if( colorId.HasValue ) {
+      query = query.Where(x => x.ColorId == colorId.Value);
+    }
+    if( minQuantity.HasValue && minQuantity.Value > 0 ) {
+      query = query.Where(x => x.Quantity > minQuantity.Value);
+    }
+
+    _logger.LogDebug($"Fetching page {page} of sets containing part {partNum}");
+    var sets = await query
+      .Select(x => x.Inventory.Set)
+      .Select(x => new Set {
+        SetNum = x.SetNum,
+        Name = x.Name,
+        Year = x.Year,
+        ThemeId = x.ThemeId,
+        ThemeName = x.Theme.Name,
+        NumParts = x.NumParts,
+      })
+      .Distinct()
+      .OrderBy(x => x.Name)
+      .Skip((int)page * PAGE_SIZE)
+      .Take(PAGE_SIZE + 1)
+      .ToArrayAsync();
+
+    _logger.LogDebug($"Returning page {page} with {sets.Length} sets");
+    return new SetListResponse {
+      Sets = sets.Take(PAGE_SIZE).Select(x => {
+        x.InventoryUrl = Url.Action("Set", "Inventories", new { setNum = x.SetNum });
+        return x;
+      }),
+      PrevPageUrl = page > 0 ? Url.Action("Containing", new { partNum, colorId, minQuantity, page = page - 1 }) : null,
+      NextPageUrl = sets.Count() > PAGE_SIZE ? Url.Action("Containing", new { partNum, colorId, minQuantity, page = page + 1 }) : null,
     };
   }
 }
