@@ -1,9 +1,9 @@
 namespace Sfko.Lego.Dto;
 
 /// <summary>
-/// An inventory details the contents of a particular set.
+/// Basic information about a particular set.
 /// </summary>
-public class Inventory
+public class BasicSetInfo
 {
   /// <summary>
   /// The unique identifier of the set.
@@ -34,6 +34,33 @@ public class Inventory
   /// </summary>
   /// <example>Classic Space</example>
   public required string ThemeName { get; set; }
+}
+
+/// <summary>
+/// An inventory detailing the contents of a particular set.
+/// </summary>
+public class Inventory : BasicSetInfo
+{
+  /// <summary>
+  /// The parts that are included in this set.
+  /// </summary>
+  public IEnumerable<InventoryPart> Parts { get; set; } = Enumerable.Empty<InventoryPart>();
+}
+
+/// <summary>
+/// An inventory detailing the common contents of two particular sets.
+/// </summary>
+public class CommonInventory
+{
+  /// <summary>
+  /// Details of the first set.
+  /// </summary>
+  public required BasicSetInfo Set1 { get; set; }
+
+  /// <summary>
+  /// Details of the second set.
+  /// </summary>
+  public required BasicSetInfo Set2 { get; set; }
 
   /// <summary>
   /// The parts that are included in this set.
