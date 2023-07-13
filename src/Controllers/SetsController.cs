@@ -31,15 +31,32 @@ public class SetsController : ControllerBase
   /// <summary>
   /// Fetches a paged list of the known sets.
   /// </summary>
+  /// <param name="criteria">The search criteria to apply</param>
   /// <param name="page">A zero-indexed page number within the results</param>
   /// <returns>Information about the matching sets</returns>
   /// <response code="200">Returns information about the matching sets</response>
   [HttpGet("")]
   [Produces("application/json")]
-  public async Task<SetListResponse> List( uint page = 0 )
+  public async Task<SetListResponse> List( [FromQuery]SetSearchCriteria criteria, uint page = 0 )
   {
+    var query = _context.Sets.AsQueryable();
+    if( null != criteria ) {
+      if( !string.IsNullOrEmpty(criteria.Name) ) {
+        query = query.Where(x => x.Name.ToLower().Contains(criteria.Name.ToLower()));
+      }
+      if( criteria.Year.HasValue ) {
+        query = query.Where(x => x.Year == criteria.Year.Value);
+      }
+      if( criteria.ThemeId.HasValue ) {
+        query = query.Where(x => x.ThemeId == criteria.ThemeId.Value);
+      }
+      if( criteria.MinParts.HasValue && criteria.MinParts > 0 ) {
+        query = query.Where(x => x.NumParts > criteria.MinParts.Value);
+      }
+    }
+
     _logger.LogDebug($"Fetching page {page} of sets");
-    var sets = await _context.Sets
+    var sets = await query
       .OrderBy(x => x.Name)
       .Skip((int)page * PAGE_SIZE)
       .Take(PAGE_SIZE + 1)
@@ -59,9 +76,20 @@ public class SetsController : ControllerBase
         x.InventoryUrl = Url.Action("Set", "Inventories", new { setNum = x.SetNum });
         return x;
       }),
-      PrevPageUrl = page > 0 ? Url.Action("List", new { page = page - 1 }) : null,
-      NextPageUrl = sets.Count() > PAGE_SIZE ? Url.Action("List", new { page = page + 1 }) : null,
+      PrevPageUrl = page > 0 ? Url.Action("List", ListRouteValues(criteria, page - 1)) : null,
+      NextPageUrl = sets.Count() > PAGE_SIZE ? Url.Action("List", ListRouteValues(criteria, page + 1)) : null,
     };
+  }
+
+  private object ListRouteValues( SetSearchCriteria? criteria, uint page )
+  {
+    if( null == criteria ) {
+      return new { page };
+    }
+
+    var criteriaParams = new RouteValueDictionary(criteria);
+    criteriaParams[nameof(page)] = page;
+    return criteriaParams;
   }
 
   /// <summary>
